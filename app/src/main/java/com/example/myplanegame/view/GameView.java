@@ -9,6 +9,7 @@ import android.graphics.Paint;
 import android.support.annotation.Nullable;
 import android.text.TextPaint;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
 
 import com.example.myplanegame.R;
@@ -114,6 +115,12 @@ public class GameView extends View {
     public void pause() {
     }
 
+    private void restart() {
+    }
+
+    private void resume() {
+    }
+
     /*-------------------------------destroy------------------------------------*/
     private void destroyNotRecyleBitmaps(){
         //将游戏设置为销毁状态
@@ -150,15 +157,46 @@ public class GameView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        //我们在每一帧都检测是否满足延迟触发单击事件的条件
+        if(isSingleClick()){
+            onSingleClick(touchX, touchY);
+        }
+
+        super.onDraw(canvas);
+        System.out.println(status+"");
+        if(status == STATUS_GAME_STARTED){
+            drawGameStarted(canvas);
+        }else if(status == STATUS_GAME_PAUSED){
+            drawGamePaused(canvas);
+        }else if(status == STATUS_GAME_OVER){
+            drawGameOver(canvas);
+        }
+    }
+    
+    private void drawGameOver(Canvas canvas) {
+
+    }
+    
+    private void drawGamePaused(Canvas canvas) {
+    }
+
+    private void drawGameStarted(Canvas canvas) {
         //第一次绘制时，将战斗机移到Canvas最下方，在水平方向的中心
         if(frame == 0){
             float centerX = canvas.getWidth() / 2;
             float centerY = canvas.getHeight() - combatAircraft.getHeight() / 2;
             combatAircraft.centerTo(centerX, centerY);
         }
+
+        //将spritesNeedAdded添加到sprites中
+        if(objsNeedAdded.size() > 0){
+            gameObjects.addAll(objsNeedAdded);
+            objsNeedAdded.clear();
+        }
         frame++;
+
         if(combatAircraft != null){
-            //绘制战斗机
+            //最后绘制战斗机
             combatAircraft.draw(canvas, paint, this);
             if(combatAircraft.isDestroyed()){
                 //如果战斗机被击中销毁了，那么游戏结束
@@ -169,4 +207,131 @@ public class GameView extends View {
         }
     }
 
+    
+
+    /*-------------------------------touch------------------------------------*/
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event){
+        //通过调用resolveTouchType方法，得到我们想要的事件类型
+        //需要注意的是resolveTouchType方法不会返回TOUCH_SINGLE_CLICK类型
+        //我们会在onDraw方法每次执行的时候，都会调用isSingleClick方法检测是否触发了单击事件
+        int touchType = resolveTouchType(event);
+        if(status == STATUS_GAME_STARTED){
+            if(touchType == TOUCH_MOVE){
+                if(combatAircraft != null){
+                    combatAircraft.centerTo(touchX, touchY);
+                }
+            }else if(touchType == TOUCH_DOUBLE_CLICK){
+
+            }
+        }else if(status == STATUS_GAME_PAUSED){
+            if(lastSingleClickTime > 0){
+                postInvalidate();
+            }
+        }else if(status == STATUS_GAME_OVER){
+            if(lastSingleClickTime > 0){
+                postInvalidate();
+            }
+        }
+        return true;
+    }
+
+    private int resolveTouchType(MotionEvent event) {
+        int touchType = -1;
+        int action = event.getAction();
+        touchX = event.getX();
+        touchY = event.getY();
+        if (action == MotionEvent.ACTION_MOVE) {
+            long deltaTime = System.currentTimeMillis() - touchDownTime;
+            if (deltaTime > singleClickDurationTime){
+                //触点移动
+                touchType = TOUCH_MOVE;
+            }
+        } else if (action == MotionEvent.ACTION_DOWN){
+            //触点按下
+            touchDownTime = System.currentTimeMillis();
+        } else if(action == MotionEvent.ACTION_UP){
+            //触点弹起
+            touchUpTime = System.currentTimeMillis();
+            //计算触点按下到触点弹起之间的时间差
+            long downUpDurationTime = touchUpTime - touchDownTime;
+            //如果此次触点按下和抬起之间的时间差小于一次单击事件指定的时间差，
+            //认为发生了一次单击
+            if (downUpDurationTime <= singleClickDurationTime){
+                //计算这次单击距离上次单击的时间差
+                long twoClickDurationTime = touchUpTime - lastSingleClickTime;
+
+                if (twoClickDurationTime <= downUpDurationTime){
+                    //如果两次单击的时间差小于一次双击事件执行的时间差，
+                    //认为发生了一次双击事件
+                    touchType = TOUCH_DOUBLE_CLICK;
+
+                    lastSingleClickTime = -1;
+                    touchDownTime = -1;
+                    touchUpTime = -1;
+                } else {
+                    //如果这次形成了单击事件，但是没有形成双击事件，那么我们暂不触发此次形成的单击事件
+                    //我们应该在doubleClickDurationTime毫秒后看一下有没有再次形成第二个单击事件
+                    //如果那时形成了第二个单击事件，那么我们就与此次的单击事件合成一次双击事件
+                    //否则在doubleClickDurationTime毫秒后触发此次的单击事件
+                    lastSingleClickTime = touchUpTime;
+                }
+            }
+        }
+        return touchType;
+    }
+
+    //在onDraw方法中调用该方法，在每一帧都检查是不是发生了单击事件
+    private boolean isSingleClick(){
+        boolean singleClick = false;
+        //我们检查一下是不是上次的单击事件在经过了doubleClickDurationTime毫秒后满足触发单击事件的条件
+        if(lastSingleClickTime > 0){
+            //计算当前时刻距离上次发生单击事件的时间差
+            long deltaTime = System.currentTimeMillis() - lastSingleClickTime;
+
+            if(deltaTime >= doubleClickDurationTime){
+                //如果时间差超过了一次双击事件所需要的时间差，
+                //那么就在此刻延迟触发之前本该发生的单击事件
+                singleClick = true;
+                //重置变量
+                lastSingleClickTime = -1;
+                touchDownTime = -1;
+                touchUpTime = -1;
+            }
+        }
+        return singleClick;
+    }
+    private void onSingleClick(float x, float y){
+        if(status == STATUS_GAME_STARTED){
+            if(isClickPause(x, y)){
+                //单击了暂停按钮
+                pause();
+            }
+        }else if(status == STATUS_GAME_PAUSED){
+            if(isClickContinueButton(x, y)){
+                //单击了“继续”按钮
+                resume();
+            }
+        }else if(status == STATUS_GAME_OVER){
+            if(isClickRestartButton(x, y)){
+                //单击了“重新开始”按钮
+                restart();
+            }
+        }
+    }
+
+
+
+    private boolean isClickRestartButton(float x, float y) {
+        return true;
+    }
+
+    private boolean isClickContinueButton(float x, float y) {
+        return true;
+    }
+
+    private boolean isClickPause(float x, float y) {
+        return true;
+    }
 }

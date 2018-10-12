@@ -53,13 +53,14 @@ public class GameObject {
         return y;
     }
 
+    //bitmap的宽度
     public float getWidth(){
         if(bitmap != null){
             return bitmap.getWidth();
         }
         return 0;
     }
-
+    //bitmap的高度
     public float getHeight(){
         if(bitmap != null){
             return bitmap.getHeight();
