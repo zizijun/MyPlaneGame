@@ -57,20 +57,40 @@ public class CombatAircraft extends GameObject{
 
     //发射子弹
     private void fireBullet(GameView gameView) {
-        if (collide || isDestroyed()) {
+        //如果战斗机被撞击了或销毁了，那么不会发射子弹
+        if(collide || isDestroyed()){
             return;
         }
-        //子弹的初始位置在战机的正中间向上5
+
         float x = getX() + getWidth() / 2;
         float y = getY() - 5;
         if(single){
-
-        }else {
-
+            //单发模式下发射单发黄色子弹
+            Bitmap yellowBulletBitmap = gameView.getYellowBulletBitmap();
+            Bullet yellowBullet = new Bullet(yellowBulletBitmap);
+            yellowBullet.moveTo(x, y);
+            gameView.addGameObject(yellowBullet);
         }
-        if(doubleTime >= maxDoubleTime){
-            single = true;
-            doubleTime = 0;
+        else{
+            //双发模式下发射两发蓝色子弹
+            float offset = getWidth() / 4;
+            float leftX = x - offset;
+            float rightX = x + offset;
+            Bitmap blueBulletBitmap = gameView.getBlueBulletBitmap();
+
+            Bullet leftBlueBullet = new Bullet(blueBulletBitmap);
+            leftBlueBullet.moveTo(leftX, y);
+            gameView.addGameObject(leftBlueBullet);
+
+            Bullet rightBlueBullet = new Bullet(blueBulletBitmap);
+            rightBlueBullet.moveTo(rightX, y);
+            gameView.addGameObject(rightBlueBullet);
+
+            doubleTime++;
+            if(doubleTime >= maxDoubleTime){
+                single = true;
+                doubleTime = 0;
+            }
         }
     }
 

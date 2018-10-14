@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.support.annotation.Nullable;
 import android.text.TextPaint;
 import android.util.AttributeSet;
@@ -13,10 +14,12 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import com.example.myplanegame.R;
+import com.example.myplanegame.object.Bullet;
 import com.example.myplanegame.object.CombatAircraft;
 import com.example.myplanegame.object.GameObject;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 public class GameView extends View {
@@ -172,15 +175,10 @@ public class GameView extends View {
             drawGameOver(canvas);
         }
     }
-    
-    private void drawGameOver(Canvas canvas) {
-
-    }
-    
-    private void drawGamePaused(Canvas canvas) {
-    }
 
     private void drawGameStarted(Canvas canvas) {
+        //drawScoreAndBombs(canvas);
+
         //第一次绘制时，将战斗机移到Canvas最下方，在水平方向的中心
         if(frame == 0){
             float centerX = canvas.getWidth() / 2;
@@ -188,12 +186,34 @@ public class GameView extends View {
             combatAircraft.centerTo(centerX, centerY);
         }
 
-        //将spritesNeedAdded添加到sprites中
+        //将objsNeedAdded添加到gameObjects中
         if(objsNeedAdded.size() > 0){
             gameObjects.addAll(objsNeedAdded);
             objsNeedAdded.clear();
         }
+
+
+        //检查战斗机跑到子弹前面的情况
+        destroyBulletsFrontOfCombatAircraft();
+        
         frame++;
+
+        //遍历sprites，绘制敌机、子弹、奖励、爆炸效果
+        Iterator<GameObject> iterator = gameObjects.iterator();
+        while (iterator.hasNext()){
+            GameObject obj = iterator.next();
+
+            if(!obj.isDestroyed()){
+                //在Sprite的draw方法内有可能会调用destroy方法
+                obj.draw(canvas, paint, this);
+            }
+
+            //我们此处要判断Sprite在执行了draw方法后是否被destroy掉了
+            if(obj.isDestroyed()){
+                //如果Sprite被销毁了，那么从Sprites中将其移除
+                iterator.remove();
+            }
+        }
 
         if(combatAircraft != null){
             //最后绘制战斗机
@@ -207,7 +227,27 @@ public class GameView extends View {
         }
     }
 
-    
+    //检查战斗机跑到子弹前面的情况
+    private void destroyBulletsFrontOfCombatAircraft() {
+        if(combatAircraft != null){
+            float aircraftY = combatAircraft.getY();
+            List<Bullet> aliveBullets = getAliveBullets();
+            for(Bullet bullet : aliveBullets){
+                //如果战斗机跑到了子弹前面，那么就销毁子弹
+                if(aircraftY <= bullet.getY()){
+                    bullet.destroy();
+                }
+            }
+        }
+    }
+
+    private void drawGamePaused(Canvas canvas) {
+
+    }
+
+    private void drawGameOver(Canvas canvas) {
+
+    }
 
     /*-------------------------------touch------------------------------------*/
 
@@ -333,5 +373,48 @@ public class GameView extends View {
 
     private boolean isClickPause(float x, float y) {
         return true;
+    }
+
+    /*-------------------------------public------------------------------------*/
+    //向Sprites中添加Sprite
+    public void addGameObject(GameObject gameObject){
+        objsNeedAdded.add(gameObject);
+    }
+
+    //添加得分
+    public void addScore(int value){
+        score += value;
+    }
+
+    public int getStatus(){
+        return status;
+    }
+
+    public float getDensity(){
+        return density;
+    }
+
+    public Bitmap getYellowBulletBitmap(){
+        return bitmaps.get(2);
+    }
+
+    public Bitmap getBlueBulletBitmap(){
+        return bitmaps.get(3);
+    }
+
+    public Bitmap getExplosionBitmap(){
+        return bitmaps.get(1);
+    }
+
+    //获取处于活动状态的子弹
+    public List<Bullet> getAliveBullets(){
+        List<Bullet> bullets = new ArrayList<Bullet>();
+        for(GameObject obj : gameObjects){
+            if(!obj.isDestroyed() && obj instanceof Bullet){
+                Bullet bullet = (Bullet)obj;
+                bullets.add(bullet);
+            }
+        }
+        return bullets;
     }
 }
