@@ -14,9 +14,13 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import com.example.myplanegame.R;
+import com.example.myplanegame.object.AutoGameObject;
+import com.example.myplanegame.object.BigEnemyPlane;
 import com.example.myplanegame.object.Bullet;
 import com.example.myplanegame.object.CombatAircraft;
 import com.example.myplanegame.object.GameObject;
+import com.example.myplanegame.object.MiddleEnemyPlane;
+import com.example.myplanegame.object.SmallEnemyPlane;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -177,7 +181,6 @@ public class GameView extends View {
     }
 
     private void drawGameStarted(Canvas canvas) {
-        //drawScoreAndBombs(canvas);
 
         //第一次绘制时，将战斗机移到Canvas最下方，在水平方向的中心
         if(frame == 0){
@@ -186,16 +189,22 @@ public class GameView extends View {
             combatAircraft.centerTo(centerX, centerY);
         }
 
-        //将objsNeedAdded添加到gameObjects中
+        //将spritesNeedAdded添加到sprites中
         if(objsNeedAdded.size() > 0){
             gameObjects.addAll(objsNeedAdded);
             objsNeedAdded.clear();
         }
 
-
         //检查战斗机跑到子弹前面的情况
         destroyBulletsFrontOfCombatAircraft();
-        
+
+        //在绘制之前先移除掉已经被destroyed的Sprite
+        removeDestroyedSprites();
+
+        //每隔30帧随机添加GameObject
+        if(frame % 30 == 0){
+            createRandom(canvas.getWidth());
+        }
         frame++;
 
         //遍历sprites，绘制敌机、子弹、奖励、爆炸效果
@@ -204,7 +213,6 @@ public class GameView extends View {
             GameObject obj = iterator.next();
 
             if(!obj.isDestroyed()){
-                //在Sprite的draw方法内有可能会调用destroy方法
                 obj.draw(canvas, paint, this);
             }
 
@@ -227,6 +235,53 @@ public class GameView extends View {
         }
     }
 
+    private void createRandom(int width) {
+        GameObject obj = null;
+        int speed = 2;
+        //callTime表示createRandomSprites方法被调用的次数
+        int callTime = Math.round(frame / 30);
+        if((callTime + 1) % 25 == 0){ //每25帧发送道具奖品
+
+        }
+        else{
+            //发送敌机
+            int[] nums = {0,0,0,0,0,1,0,0,1,0,0,0,0,1,1,1,1,1,1,2};
+            int index = (int)Math.floor(nums.length*Math.random());
+            int type = nums[index];
+            if(type == 0){
+                //小敌机
+                obj = new SmallEnemyPlane(bitmaps.get(4));
+            }
+            else if(type == 1){
+                //中敌机
+                obj = new MiddleEnemyPlane(bitmaps.get(5));
+            }
+            else if(type == 2){
+                //大敌机
+                obj = new BigEnemyPlane(bitmaps.get(6));
+            }
+            if(type != 2){
+                if(Math.random() < 0.33){
+                    speed = 4;
+                }
+            }
+        }
+
+        if(obj != null){
+            float spriteWidth = obj.getWidth();
+            float spriteHeight = obj.getHeight();
+            float x = (float)((width - spriteWidth) * Math.random());
+            float y = -spriteHeight;
+            obj.setX(x);
+            obj.setY(y);
+            if(obj instanceof AutoGameObject){
+                AutoGameObject autoSprite = (AutoGameObject)obj;
+                autoSprite.setSpeed(speed);
+            }
+            addGameObject(obj);
+        }
+    }
+
     //检查战斗机跑到子弹前面的情况
     private void destroyBulletsFrontOfCombatAircraft() {
         if(combatAircraft != null){
@@ -237,6 +292,17 @@ public class GameView extends View {
                 if(aircraftY <= bullet.getY()){
                     bullet.destroy();
                 }
+            }
+        }
+    }
+
+    //移除掉已经destroyed的
+    private void removeDestroyedSprites(){
+        Iterator<GameObject> iterator = gameObjects.iterator();
+        while (iterator.hasNext()){
+            GameObject s = iterator.next();
+            if(s.isDestroyed()){
+                iterator.remove();
             }
         }
     }
